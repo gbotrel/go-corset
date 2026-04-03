@@ -1,0 +1,48 @@
+\frametitle{Trace Generation}
+
+\begin{columns}
+\begin{column}{0.55\textwidth}
+\textbf{Executor State}
+\begin{lstlisting}[style=golang]
+type State struct {
+    pc        uint      // Program counter
+    terminal  bool      // Done?
+    state     []big.Int // Register values
+    io        Map       // I/O for calls
+}
+\end{lstlisting}
+
+\vspace{0.5em}
+\textbf{Execution Loop}
+\begin{lstlisting}[style=golang]
+for !state.terminal {
+    insn := program[state.pc]
+    state.pc = insn.Execute(state)
+}
+\end{lstlisting}
+\end{column}
+
+\begin{column}{0.45\textwidth}
+\textbf{Trace Structure}
+
+\begin{table}
+\centering
+\scriptsize
+\begin{tabular}{cccc}
+\toprule
+Row & PC & a & b \\
+\midrule
+0 & 1 & 5 & 3 \\
+1 & 2 & 5 & 3 \\
+2 & 3 & 6 & 2 \\
+3 & 2 & 6 & 2 \\
+4 & 3 & 7 & 1 \\
+5 & 2 & 7 & 1 \\
+6 & 4 & 8 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Each row = one execution step
+\end{column}
+\end{columns}

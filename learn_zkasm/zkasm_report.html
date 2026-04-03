@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>zkASM Tutorial - Zero-Knowledge Assembly Programming</title>
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --bg-card: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --code-bg: #0d1117;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        h2 {
+            color: var(--accent);
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        h3 {
+            color: var(--accent-purple);
+            font-size: 1.2rem;
+            margin: 1.5rem 0 0.75rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        @media (max-width: 900px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        code {
+            font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+            background: var(--code-bg);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 6px 6px 0 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .code-header + pre {
+            border-radius: 0 0 6px 6px;
+            margin-top: 0;
+        }
+
+        .language-tag {
+            background: var(--accent-purple);
+            color: white;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent-green);
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .test-result {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            margin: 0.25rem 0;
+            font-family: monospace;
+        }
+
+        .test-pass {
+            background: rgba(63, 185, 80, 0.1);
+            border-left: 3px solid var(--accent-green);
+        }
+
+        .test-pass::before {
+            content: "✓";
+            color: var(--accent-green);
+            margin-right: 0.75rem;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-card);
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .keyword { color: #ff7b72; }
+        .function { color: #d2a8ff; }
+        .variable { color: #79c0ff; }
+        .type { color: #7ee787; }
+        .comment { color: #8b949e; font-style: italic; }
+        .number { color: #a5d6ff; }
+        .string { color: #a5d6ff; }
+
+        .toc {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .toc ul {
+            list-style: none;
+            padding-left: 1rem;
+        }
+
+        .toc a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(88, 166, 255, 0.1) 0%, rgba(163, 113, 247, 0.1) 100%);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .constraint-box {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            font-family: monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>zkASM Tutorial</h1>
+            <p class="subtitle">Zero-Knowledge Assembly Programming with go-corset</p>
+        </header>
+
+        <nav class="toc">
+            <strong>Table of Contents</strong>
+            <ul>
+                <li><a href="#intro">1. Introduction to zkASM</a></li>
+                <li><a href="#syntax">2. zkASM Syntax Reference</a></li>
+                <li><a href="#example1">3. Example 1: Cubic Polynomial (x^3 + x + 5 = Y)</a></li>
+                <li><a href="#example2">4. Example 2: RSA Factorization Proof</a></li>
+                <li><a href="#testing">5. Testing zkASM Programs</a></li>
+                <li><a href="#comparison">6. Comparison with gnark</a></li>
+            </ul>
+        </nav>
+
+        <section id="intro">
+            <h2>1. Introduction to zkASM</h2>
+            <div class="card">
+                <p>zkASM (Zero-Knowledge Assembly) is a low-level language for writing arithmetic constraints that compile to zero-knowledge proofs. It's part of the <strong>go-corset</strong> toolchain developed by Consensys.</p>
+
+                <h3>Key Features</h3>
+                <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                    <li>Lisp-inspired assembly syntax</li>
+                    <li>Variable-width integer types (u1, u8, u16, u32, u256, etc.)</li>
+                    <li>Automatic overflow handling with multi-value returns</li>
+                    <li>Conditional branching and control flow</li>
+                    <li>Compiles to AIR (Arithmetic Intermediate Representation)</li>
+                    <li>Support for multiple finite fields (BLS12-377, KoalaBear, GF(8209))</li>
+                </ul>
+            </div>
+
+            <h3>Installation</h3>
+            <div class="code-header">
+                <span>Build go-corset from source</span>
+                <span class="language-tag">bash</span>
+            </div>
+            <pre><span class="comment"># Clone and build</span>
+git clone https://github.com/consensys/go-corset
+cd go-corset
+make build
+
+<span class="comment"># The binary is at ./bin/go-corset</span></pre>
+        </section>
+
+        <section id="syntax">
+            <h2>2. zkASM Syntax Reference</h2>
+
+            <h3>Basic Structure</h3>
+            <div class="code-header">
+                <span>Function declaration</span>
+                <span class="language-tag">zkasm</span>
+            </div>
+            <pre><span class="comment">;; Comments start with ;;</span>
+
+<span class="keyword">fn</span> <span class="function">function_name</span>(<span class="variable">input1</span> <span class="type">u16</span>, <span class="variable">input2</span> <span class="type">u16</span>) -> (<span class="variable">output</span> <span class="type">u16</span>) {
+   <span class="keyword">var</span> <span class="variable">temp</span> <span class="type">u16</span>      <span class="comment">;; Local variable</span>
+   <span class="keyword">var</span> <span class="variable">carry</span> <span class="type">u1</span>      <span class="comment">;; 1-bit carry flag</span>
+
+   <span class="comment">;; Instructions here</span>
+
+   <span class="keyword">return</span>
+}</pre>
+
+            <h3>Type System</h3>
+            <table>
+                <tr><th>Type</th><th>Bits</th><th>Range</th><th>Common Use</th></tr>
+                <tr><td><code>u1</code></td><td>1</td><td>0-1</td><td>Booleans, carry flags</td></tr>
+                <tr><td><code>u8</code></td><td>8</td><td>0-255</td><td>Bytes</td></tr>
+                <tr><td><code>u16</code></td><td>16</td><td>0-65535</td><td>Small integers</td></tr>
+                <tr><td><code>u32</code></td><td>32</td><td>0-4B</td><td>Overflow capture</td></tr>
+                <tr><td><code>u256</code></td><td>256</td><td>0-2^256</td><td>Large integers, hashes</td></tr>
+            </table>
+
+            <h3>Instructions</h3>
+            <table>
+                <tr><th>Instruction</th><th>Syntax</th><th>Description</th></tr>
+                <tr><td>Assignment</td><td><code>result = expr</code></td><td>Simple assignment</td></tr>
+                <tr><td>Add with carry</td><td><code>c, result = a + b</code></td><td>Addition, c captures overflow</td></tr>
+                <tr><td>Sub with borrow</td><td><code>b, result = a - b</code></td><td>Subtraction, b captures underflow</td></tr>
+                <tr><td>Multiply</td><td><code>hi, lo = a * b</code></td><td>Multiplication with overflow</td></tr>
+                <tr><td>Conditional jump</td><td><code>if x == 0 goto label</code></td><td>Branch if condition true</td></tr>
+                <tr><td>Unconditional jump</td><td><code>goto label</code></td><td>Always branch</td></tr>
+                <tr><td>Label</td><td><code>label_name:</code></td><td>Define branch target</td></tr>
+                <tr><td>Return</td><td><code>return</code></td><td>Exit function</td></tr>
+                <tr><td>Fail</td><td><code>fail</code></td><td>Constraint violation (proof fails)</td></tr>
+            </table>
+        </section>
+
+        <section id="example1">
+            <h2>3. Example 1: Cubic Polynomial (x^3 + x + 5 = Y)</h2>
+
+            <div class="highlight-box">
+                <strong>Problem:</strong> Prove knowledge of a secret value <code>x</code> such that <code>x^3 + x + 5 = Y</code>, where <code>Y</code> is public.
+            </div>
+
+            <div class="comparison">
+                <div>
+                    <h3>gnark (Go)</h3>
+                    <div class="code-header">
+                        <span>example_gnark2.go</span>
+                        <span class="language-tag">go</span>
+                    </div>
+                    <pre><span class="keyword">type</span> Circuit <span class="keyword">struct</span> {
+    X frontend.Variable <span class="string">`gnark:"x"`</span>
+    Y frontend.Variable <span class="string">`gnark:",public"`</span>
+}
+
+<span class="keyword">func</span> (c *Circuit) <span class="function">Define</span>(api frontend.API) <span class="keyword">error</span> {
+    <span class="comment">// x^3</span>
+    x3 := api.<span class="function">Mul</span>(c.X, c.X, c.X)
+    <span class="comment">// x^3 + x + 5</span>
+    res := api.<span class="function">Add</span>(x3, c.X, <span class="number">5</span>)
+    <span class="comment">// Assert Y == res</span>
+    api.<span class="function">AssertIsEqual</span>(c.Y, res)
+    <span class="keyword">return</span> <span class="keyword">nil</span>
+}</pre>
+                </div>
+                <div>
+                    <h3>zkASM</h3>
+                    <div class="code-header">
+                        <span>cubic_polynomial.zkasm</span>
+                        <span class="language-tag">zkasm</span>
+                    </div>
+                    <pre><span class="comment">;; Prove: x^3 + x + 5 == Y</span>
+<span class="keyword">fn</span> <span class="function">cubic</span>(<span class="variable">x</span> <span class="type">u16</span>, <span class="variable">Y</span> <span class="type">u16</span>) -> () {
+   <span class="keyword">var</span> <span class="variable">x2</span> <span class="type">u16</span>
+   <span class="keyword">var</span> <span class="variable">x3</span> <span class="type">u16</span>
+   <span class="keyword">var</span> <span class="variable">sum1</span> <span class="type">u16</span>
+   <span class="keyword">var</span> <span class="variable">result</span> <span class="type">u16</span>
+   <span class="keyword">var</span> <span class="variable">diff</span> <span class="type">u16</span>
+   <span class="keyword">var</span> <span class="variable">tmp</span> <span class="type">u32</span>
+   <span class="keyword">var</span> <span class="variable">c</span> <span class="type">u1</span>
+
+   <span class="comment">;; x^2 = x * x</span>
+   tmp, x2 = x * x
+   <span class="comment">;; x^3 = x^2 * x</span>
+   tmp, x3 = x2 * x
+   <span class="comment">;; sum1 = x^3 + x</span>
+   c, sum1 = x3 + x
+   <span class="comment">;; result = sum1 + 5</span>
+   c, result = sum1 + <span class="number">5</span>
+
+   <span class="comment">;; Assert Y == result</span>
+   c, diff = Y - result
+   <span class="keyword">if</span> diff == <span class="number">0</span> <span class="keyword">goto</span> <span class="variable">success</span>
+   <span class="keyword">fail</span>
+<span class="variable">success</span>:
+   <span class="keyword">return</span>
+}</pre>
+                </div>
+            </div>
+
+            <h3>Compilation Statistics</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">20</div>
+                    <div class="stat-label">Total Constraints</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">9</div>
+                    <div class="stat-label">Vanishing Constraints</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">11</div>
+                    <div class="stat-label">Range Constraints</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">11</div>
+                    <div class="stat-label">Columns</div>
+                </div>
+            </div>
+
+            <h3>Test Results</h3>
+            <div class="card">
+                <div class="test-result test-pass">x=0: 0^3 + 0 + 5 = 5</div>
+                <div class="test-result test-pass">x=1: 1^3 + 1 + 5 = 7</div>
+                <div class="test-result test-pass">x=2: 2^3 + 2 + 5 = 15</div>
+                <div class="test-result test-pass">x=3: 3^3 + 3 + 5 = 35</div>
+                <div class="test-result test-pass">x=10: 10^3 + 10 + 5 = 1015</div>
+            </div>
+
+            <h3>Generated AIR Constraints (Key Excerpt)</h3>
+            <div class="constraint-box">
+<span class="comment">;; Module and inputs</span>
+(module cubic)
+(inputs (x u16 0x0) (Y u16 0x0))
+
+<span class="comment">;; x^2 computation: x2 + 65536*tmp = x * x</span>
+(vanish cubic:pc0#0
+  (* (- 1 (* (- $pc 1) "(inv ...)")
+     (- (+ x2 (* 65536 tmp)) (* x x))))
+
+<span class="comment">;; x^3 computation: x3 + 65536*tmp = x * x2</span>
+(vanish cubic:pc1#0
+  (* (- 1 (* (- $pc 2) "(inv ...)")
+     (- (+ x3 (* 65536 tmp)) (* x (shift x2 -1)))))
+
+<span class="comment">;; Final assertion: diff must be zero (Y == result)</span>
+(vanish cubic:pc3#2
+  (* (- 1 (* (- $pc 4) "(inv ...)")
+     diff))</div>
+        </section>
+
+        <section id="example2">
+            <h2>4. Example 2: RSA Factorization Proof</h2>
+
+            <div class="highlight-box">
+                <strong>Problem:</strong> Prove knowledge of secret factors <code>P</code> and <code>Q</code> such that <code>P * Q = RSA</code>, where <code>RSA</code> is public and both <code>P != 1</code> and <code>Q != 1</code> (non-trivial factorization).
+            </div>
+
+            <div class="comparison">
+                <div>
+                    <h3>gnark (Go)</h3>
+                    <div class="code-header">
+                        <span>example_gnark1.go</span>
+                        <span class="language-tag">go</span>
+                    </div>
+                    <pre><span class="keyword">type</span> Circuit <span class="keyword">struct</span> {
+    P   frontend.Variable <span class="comment">// secret</span>
+    Q   frontend.Variable <span class="string">`gnark:"q,secret"`</span>
+    RSA frontend.Variable <span class="string">`gnark:",public"`</span>
+}
+
+<span class="keyword">func</span> (c *Circuit) <span class="function">Define</span>(api frontend.API) <span class="keyword">error</span> {
+    <span class="comment">// Ensure P != 1 and Q != 1</span>
+    api.<span class="function">AssertIsDifferent</span>(c.P, <span class="number">1</span>)
+    api.<span class="function">AssertIsDifferent</span>(c.Q, <span class="number">1</span>)
+
+    <span class="comment">// Compute P * Q</span>
+    rsa := api.<span class="function">Mul</span>(c.P, c.Q)
+
+    <span class="comment">// Assert P * Q == RSA</span>
+    api.<span class="function">AssertIsEqual</span>(c.RSA, rsa)
+    <span class="keyword">return</span> <span class="keyword">nil</span>
+}</pre>
+                </div>
+                <div>
+                    <h3>zkASM</h3>
+                    <div class="code-header">
+                        <span>rsa_factor.zkasm</span>
+                        <span class="language-tag">zkasm</span>
+                    </div>
+                    <pre><span class="comment">;; Prove: P*Q == RSA, P!=1, Q!=1</span>
+<span class="keyword">fn</span> <span class="function">rsa_factor</span>(<span class="variable">P</span> <span class="type">u16</span>, <span class="variable">Q</span> <span class="type">u16</span>, <span class="variable">RSA</span> <span class="type">u16</span>) -> () {
+   <span class="keyword">var</span> <span class="variable">product</span> <span class="type">u16</span>
+   <span class="keyword">var</span> <span class="variable">tmp</span> <span class="type">u32</span>
+   <span class="keyword">var</span> <span class="variable">diff</span> <span class="type">u16</span>
+   <span class="keyword">var</span> <span class="variable">c</span> <span class="type">u1</span>
+
+   <span class="comment">;; Assert P != 1</span>
+   c, diff = P - <span class="number">1</span>
+   <span class="keyword">if</span> diff != <span class="number">0</span> <span class="keyword">goto</span> <span class="variable">p_valid</span>
+   <span class="keyword">fail</span>
+
+<span class="variable">p_valid</span>:
+   <span class="comment">;; Assert Q != 1</span>
+   c, diff = Q - <span class="number">1</span>
+   <span class="keyword">if</span> diff != <span class="number">0</span> <span class="keyword">goto</span> <span class="variable">q_valid</span>
+   <span class="keyword">fail</span>
+
+<span class="variable">q_valid</span>:
+   <span class="comment">;; product = P * Q</span>
+   tmp, product = P * Q
+   <span class="comment">;; Assert RSA == product</span>
+   c, diff = RSA - product
+   <span class="keyword">if</span> diff == <span class="number">0</span> <span class="keyword">goto</span> <span class="variable">success</span>
+   <span class="keyword">fail</span>
+
+<span class="variable">success</span>:
+   <span class="keyword">return</span>
+}</pre>
+                </div>
+            </div>
+
+            <h3>Compilation Statistics</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">18</div>
+                    <div class="stat-label">Total Constraints</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">9</div>
+                    <div class="stat-label">Vanishing Constraints</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">9</div>
+                    <div class="stat-label">Range Constraints</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">9</div>
+                    <div class="stat-label">Columns</div>
+                </div>
+            </div>
+
+            <h3>Test Results</h3>
+            <div class="card">
+                <div class="test-result test-pass">P=2, Q=3: 2 * 3 = 6</div>
+                <div class="test-result test-pass">P=7, Q=11: 7 * 11 = 77</div>
+                <div class="test-result test-pass">P=13, Q=17: 13 * 17 = 221</div>
+                <div class="test-result test-pass">P=101, Q=103: 101 * 103 = 10403</div>
+            </div>
+
+            <h3>Generated AIR Constraints (Key Excerpt)</h3>
+            <div class="constraint-box">
+<span class="comment">;; Module and inputs</span>
+(module rsa_factor)
+(inputs (P u16 0x0) (Q u16 0x0) (RSA u16 0x0))
+
+<span class="comment">;; P != 1 check: diff = P - 1, must be non-zero</span>
+(vanish rsa_factor:pc0#1
+  (* (- 1 (* (- $pc 1) "(inv ...)")
+     (- 1 (* diff "(inv rsa_factor:diff)"))))
+
+<span class="comment">;; Q != 1 check: same pattern</span>
+(vanish rsa_factor:pc1#1
+  (* (- 1 (* (- $pc 2) "(inv ...)")
+     (- 1 (* diff "(inv rsa_factor:diff)"))))
+
+<span class="comment">;; Multiplication: product + 65536*tmp = P * Q</span>
+(vanish rsa_factor:pc1#2
+  (* ... (- (+ product (* 65536 tmp)) (* P Q))))
+
+<span class="comment">;; Final assertion: diff must be zero</span>
+(vanish rsa_factor:pc2#2 (* ... diff))</div>
+        </section>
+
+        <section id="testing">
+            <h2>5. Testing zkASM Programs</h2>
+
+            <h3>Test File Format (.accepts)</h3>
+            <p>Test cases are JSON objects specifying module name, inputs, and expected outputs:</p>
+            <div class="code-header">
+                <span>cubic_polynomial.accepts</span>
+                <span class="language-tag">json</span>
+            </div>
+            <pre>{ "cubic": { "x": [3], "Y": [35] } }
+{ "cubic": { "x": [0], "Y": [5] } }
+{ "cubic": { "x": [1], "Y": [7] } }</pre>
+
+            <h3>Running Tests</h3>
+            <div class="code-header">
+                <span>Using go-corset check</span>
+                <span class="language-tag">bash</span>
+            </div>
+            <pre><span class="comment"># Check a single test case</span>
+echo '{ "cubic": { "x": [3], "Y": [35] } }' | \
+  ./bin/go-corset check --batched - cubic_polynomial.zkasm
+
+<span class="comment"># Check multiple test cases from file</span>
+./bin/go-corset check --batched tests.accepts program.zkasm
+
+<span class="comment"># Debug a failing test with report</span>
+./bin/go-corset check --batched --report tests.accepts program.zkasm</pre>
+
+            <h3>Debugging Commands</h3>
+            <div class="code-header">
+                <span>Inspection and debugging</span>
+                <span class="language-tag">bash</span>
+            </div>
+            <pre><span class="comment"># View compilation statistics</span>
+./bin/go-corset debug program.zkasm --stats
+
+<span class="comment"># View AIR constraints</span>
+./bin/go-corset debug program.zkasm --air
+
+<span class="comment"># Compile to binary constraints</span>
+./bin/go-corset compile program.zkasm -o output.bin</pre>
+        </section>
+
+        <section id="comparison">
+            <h2>6. Comparison: gnark vs zkASM</h2>
+
+            <table>
+                <tr>
+                    <th>Aspect</th>
+                    <th>gnark</th>
+                    <th>zkASM</th>
+                </tr>
+                <tr>
+                    <td><strong>Abstraction Level</strong></td>
+                    <td>High-level DSL in Go</td>
+                    <td>Low-level assembly</td>
+                </tr>
+                <tr>
+                    <td><strong>Type System</strong></td>
+                    <td>Single <code>frontend.Variable</code> type</td>
+                    <td>Explicit bit-widths (u1, u16, u256)</td>
+                </tr>
+                <tr>
+                    <td><strong>Overflow Handling</strong></td>
+                    <td>Automatic (field arithmetic)</td>
+                    <td>Explicit (multi-value returns)</td>
+                </tr>
+                <tr>
+                    <td><strong>Control Flow</strong></td>
+                    <td>Go control structures</td>
+                    <td>Labels and gotos</td>
+                </tr>
+                <tr>
+                    <td><strong>Assertions</strong></td>
+                    <td><code>api.AssertIsEqual()</code></td>
+                    <td><code>if ... goto ... fail</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Backend</strong></td>
+                    <td>Groth16, PLONK</td>
+                    <td>AIR (custom prover)</td>
+                </tr>
+                <tr>
+                    <td><strong>Use Case</strong></td>
+                    <td>General ZK applications</td>
+                    <td>zkEVM, custom protocols</td>
+                </tr>
+            </table>
+
+            <div class="highlight-box">
+                <strong>When to use zkASM:</strong>
+                <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                    <li>Building zkEVM or blockchain-specific circuits</li>
+                    <li>Fine-grained control over constraint generation</li>
+                    <li>Optimizing for specific field characteristics</li>
+                    <li>Integration with Linea's proof system</li>
+                </ul>
+            </div>
+        </section>
+
+        <footer style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); text-align: center; color: var(--text-muted);">
+            <p>Generated with go-corset v1.2.0-rc5 | Toolchain: <a href="https://github.com/consensys/go-corset" style="color: var(--accent);">github.com/consensys/go-corset</a></p>
+        </footer>
+    </div>
+</body>
+</html>

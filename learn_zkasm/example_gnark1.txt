@@ -1,0 +1,45 @@
+// Welcome to the gnark playground!
+package main
+
+import "github.com/consensys/gnark/frontend"
+
+// gnark is a zk-SNARK library written in Go. Circuits are regular structs.
+// The inputs must be of type frontend.Variable and make up the witness.
+// The witness has a
+//   - secret part --> known to the prover only
+//   - public part --> known to the prover and the verifier
+type Circuit struct {
+	P   frontend.Variable // p  --> secret visibility (default)
+	Q   frontend.Variable `gnark:"q,secret"` // q  --> secret visibility
+	RSA frontend.Variable `gnark:",public"`  // rsa  --> public visibility
+}
+
+// Define declares the circuit logic. The compiler then produces a list of constraints
+// which must be satisfied (valid witness) in order to create a valid zk-SNARK
+// This circuit proves the factorisation of RSA-250 challenge
+// (Feb 28, 2020, F. Boudot, P. Gaudry, A. Guillevic, N. Heninger, E. Thomé and P. Zimmermann)
+// This is the biggest publicly factored RSA-250 challenge.
+func (circuit *Circuit) Define(api frontend.API) error {
+	// ensure we don't accept RSA * 1 == RSA
+	api.AssertIsDifferent(circuit.P, 1)
+	api.AssertIsDifferent(circuit.Q, 1)
+
+	// compute P * Q and store it in the local variable res.
+	rsa := api.Mul(circuit.P, circuit.Q)
+
+	// assert that the statement P * Q == RSA is true.
+	api.AssertIsEqual(circuit.RSA, rsa)
+	return nil
+}
+-- witness.json --
+{
+    "p": 64135289477071580278790190170577389084825014742943447208116859632024532344630238623598752668347708737661925585694639798853367,
+    "q": 33372027594978156556226010605355114227940760344767554666784520987023841729210037080257448673296881877565718986258036932062711,
+    "RSA": 2140324650240744961264423072839333563008614715144755017797754920881418023447140136643345519095804679610992851872470914587687396261921557363047454770520805119056493106687691590019759405693457452230589325976697471681738069364894699871578494975937497937
+}
+-- plonk constraints --
+-- qL⋅xa + qR⋅xb + qO⋅xc + qM⋅(xaxb) + qC == 0  --
+0,0,-1⋅v0,1⋅(x × x),0
+0,0,-1⋅v1,1⋅(v0 × x),0
+x,v1,-1⋅v2,0,5
+Y,-1⋅v2,0,0,0 

@@ -1,0 +1,38 @@
+;; Example 2: RSA Factorization Proof
+;; Prove: P * Q == RSA, with P != 1 and Q != 1
+;; This corresponds to the gnark example that proves knowledge of
+;; two non-trivial factors P and Q whose product equals RSA
+;;
+;; Note: In zkASM we use 16-bit integers for demonstration.
+;; In production, you would use u256 for actual RSA numbers.
+fn rsa_factor(P u256, Q u256, RSA u256) -> () {
+   var product u256
+   var tmp u256
+   var diff u256
+   var c u1
+
+   ;; First, assert P != 1
+   ;; (P - 1) should be non-zero
+   c, diff = P - 1
+   if diff != 0 goto p_valid
+   fail
+
+p_valid:
+   ;; Assert Q != 1
+   ;; (Q - 1) should be non-zero
+   c, diff = Q - 1
+   if diff != 0 goto q_valid
+   fail
+
+q_valid:
+   ;; Compute product = P * Q
+   tmp, product = P * Q
+
+   ;; Assert RSA == product
+   c, diff = RSA - product
+   if diff == 0 goto success
+   fail
+
+success:
+   return
+}

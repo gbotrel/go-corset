@@ -1,0 +1,35 @@
+;; Example 1: Cubic Polynomial
+;; Prove: x^3 + x + 5 == Y
+;; This corresponds to the gnark example: api.AssertIsEqual(circuit.Y, res)
+;; where res = x^3 + x + 5
+;;
+;; The function takes a secret input x and a public input Y,
+;; and proves knowledge of x such that x^3 + x + 5 = Y
+fn cubic(x u16, Y u16) -> () {
+   var x2 u16
+   var x3 u16
+   var sum1 u16
+   var result u16
+   var diff u16
+   var tmp u16
+   var c u1
+
+   ;; Compute x^2 = x * x
+   tmp, x2 = x * x
+
+   ;; Compute x^3 = x^2 * x
+   tmp, x3 = x2 * x
+
+   ;; Compute sum1 = x^3 + x
+   c, sum1 = x3 + x
+
+   ;; Compute result = sum1 + 5
+   c, result = sum1 + 5
+
+   ;; Assert Y == result (compute diff = Y - result, fail if non-zero)
+   c, diff = Y - result
+   if diff == 0 goto success
+   fail
+success:
+   return
+}
