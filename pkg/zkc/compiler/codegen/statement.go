@@ -75,21 +75,37 @@ func (p *Compiler) compileStatement(pc uint, mapping []uint, s Stmt) Instruction
 	return instruction.NewVector[word.Uint](insns...)
 }
 
-// Map lvals down to their corresponding registers.
-func (p *Compiler) mapLVals(mapping []uint, lvals []LVal) ([]register.Id, []MicroInstruction, []MicroInstruction) {
+// Map lvals down to their corresponding registers.  For example, consider the
+// following:
+//
+// > struct tmp { x u32, y u32 }
+// > ...
+// > var t tmp > tmp = f(...)
+//
+// In this case, we want to "compile out" the struct, so we end up with this:
+//
+// > var tmp$x, tmp$y u32
+// >
+// > tmp$x, tmp$y = f(...)
+//
+// Here, we have compiled out variable tmp into two registers, one for each
+// field.
+func (p *Compiler) mapLVals(mapping []uint, lvals []LVal) ([]register.Vector, []MicroInstruction, []MicroInstruction) {
 	var (
-		regs                = make([]register.Id, len(lvals))
+		regs                = make([]register.Vector, len(lvals))
 		preInsns, postInsns []MicroInstruction
 	)
 	//
 	for i, lv := range lvals {
 		switch lv := lv.(type) {
 		case *lval.Variable[symbol.Resolved]:
-			if len(lv.Ids) != 1 {
-				panic("todo")
+			var ids = make([]register.Id, len(lv.Ids))
+			//
+			for j, id := range lv.Ids {
+				ids[j] = register.NewId(id)
 			}
 			//
-			regs[i] = register.NewId(lv.Ids[0])
+			regs[i] = register.NewVector(ids...)
 		case *lval.MemAccess[symbol.Resolved]:
 			var (
 				ext = p.components[lv.Name.Index].(*Memory)
@@ -111,7 +127,7 @@ func (p *Compiler) mapLVals(mapping []uint, lvals []LVal) ([]register.Id, []Micr
 				bitwidth := data.BitWidthOf(t.DataType, p.environment)
 				sources[j] = p.allocate(bitwidth)
 				// FIXME: broken when len(ext.Data) > 1
-				regs[i+j] = sources[j]
+				regs[i+j] = register.NewVector(sources[j])
 			}
 			//
 			preInsns = append(preInsns, pre...)
@@ -169,9 +185,8 @@ func (p *Compiler) compileCondition(pc uint, e Condition, mapping []uint, target
 	return instruction.NewVector[word.Uint](insns...)
 }
 
-func (p *Compiler) compileExpr(e Expr, mapping []uint, targets ...register.Id) []MicroInstruction {
+func (p *Compiler) compileExpr(e Expr, mapping []uint, targets ...register.Vector) []MicroInstruction {
 	var (
-		zero     word.Uint
 		insns    []MicroInstruction
 		insn     MicroInstruction
 		unitExpr = false
@@ -190,13 +205,13 @@ func (p *Compiler) compileExpr(e Expr, mapping []uint, targets ...register.Id) [
 	case *expr.Const[symbol.Resolved]:
 		var c word.Uint
 		//
-		insn = instruction.NewAdd[word.Uint](targets[0], nil, c.SetBigInt(&e.Constant))
+		insns, insn = p.compileConst(c.SetBigInt(&e.Constant), mapping, targets[0])
 		unitExpr = true
 	case *expr.ExternAccess[symbol.Resolved]:
 		//
 		switch ext := p.components[e.Name.Index].(type) {
 		case *Constant:
-			insn = instruction.NewAdd[word.Uint](targets[0], nil, p.evalConstant(e))
+			insns, insn = p.compileConst(p.evalConstant(e), mapping, targets[0])
 			unitExpr = true
 		case *Memory:
 			if !ext.IsReadable() {
@@ -210,9 +225,7 @@ func (p *Compiler) compileExpr(e Expr, mapping []uint, targets ...register.Id) [
 			panic(fmt.Sprintf("unknown symbol \"%s\" encountered", e.Name.String()))
 		}
 	case *expr.LocalAccess[symbol.Resolved]:
-		var reg = []register.Id{register.NewId(e.Variable)}
-		//
-		insn = instruction.NewAdd[word.Uint](targets[0], reg, zero)
+		insns, insn = p.compileLocalAccess(e, mapping, targets[0])
 		unitExpr = true
 	case *expr.Mul[symbol.Resolved]:
 		insns, insn = p.compileMul(e.Exprs, mapping, targets[0])
@@ -252,22 +265,48 @@ func (p *Compiler) compileExpr(e Expr, mapping []uint, targets ...register.Id) [
 	return append(insns, insn)
 }
 
-func (p *Compiler) compileCast(e *expr.Cast[symbol.Resolved], mapping []uint, target register.Id,
+func (p *Compiler) compileConst(c word.Uint, mapping []uint, targets register.Vector,
 ) ([]MicroInstruction, MicroInstruction) {
-	castWidth := e.CastType.AsUint(p.environment).BitWidth()
-	sources, insns := p.compileArgs(mapping, e.Expr)
+	var (
+		target = targets.Registers()[0]
+	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
+	//
+	return nil, instruction.NewAdd[word.Uint](target, nil, c)
+}
+
+func (p *Compiler) compileCast(e *expr.Cast[symbol.Resolved], mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
+	var (
+		target         = targets.Registers()[0]
+		castWidth      = e.CastType.AsUint(p.environment).BitWidth()
+		sources, insns = p.compileArgs(mapping, e.Expr)
+	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	//
 	return insns, instruction.NewCast[word.Uint](target, sources[0], castWidth)
 }
 
-func (p *Compiler) compileAdd(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileAdd(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
 	//
 	var (
+		target   = targets.Registers()[0]
 		constant word.Uint
 		nargs    []Expr
 		w        word.Uint
 		bitwidth = p.registers[target.Unwrap()].Width()
 	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	//
 	for _, e := range args {
 		var overflow bool
@@ -292,33 +331,76 @@ func (p *Compiler) compileAdd(args []Expr, mapping []uint, target register.Id) (
 }
 
 func (p *Compiler) compileFunctionCall(e *expr.ExternAccess[symbol.Resolved], fn *Function, mapping []uint,
-	targets ...register.Id) ([]MicroInstruction, MicroInstruction) {
-	// Determine vm module identifier
-	var id = mapping[e.Name.Index]
+	targets ...register.Vector) ([]MicroInstruction, MicroInstruction) {
+	var (
+		registers = make([]register.Id, len(targets))
+		// Determine vm module identifier
+		id = mapping[e.Name.Index]
+	)
+	//
+	for i, vec := range targets {
+		if len(vec.Registers()) != 1 {
+			panic("need to implement destructuring")
+		}
+		//
+		registers[i] = vec.Registers()[0]
+	}
 	// Compile arguments
 	sources, insns := p.compileArgs(mapping, e.Args...)
 	// determine type of read
-	return insns, instruction.NewCall[word.Uint](id, targets, sources)
+	return insns, instruction.NewCall[word.Uint](id, registers, sources)
+}
+
+func (p *Compiler) compileLocalAccess(e *expr.LocalAccess[symbol.Resolved], mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
+	var (
+		zero   word.Uint
+		target = targets.Registers()[0]
+		reg    = []register.Id{register.NewId(e.Variable)}
+	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
+	//
+	return nil, instruction.NewAdd[word.Uint](target, reg, zero)
 }
 
 func (p *Compiler) compileMemoryRead(e *expr.ExternAccess[symbol.Resolved], mem *Memory, mapping []uint,
-	targets ...register.Id) ([]MicroInstruction, MicroInstruction) {
-	// Determine vm module identifier
-	var id = mapping[e.Name.Index]
+	targets ...register.Vector) ([]MicroInstruction, MicroInstruction) {
+	var (
+		registers = make([]register.Id, len(targets))
+		// Determine vm module identifier
+		id = mapping[e.Name.Index]
+	)
+	//
+	for i, vec := range targets {
+		if len(vec.Registers()) != 1 {
+			panic("need to implement destructuring")
+		}
+		//
+		registers[i] = vec.Registers()[0]
+	}
 	// Compile arguments
 	sources, insns := p.compileArgs(mapping, e.Args...)
 	// determine type of read
-	return insns, instruction.NewMemRead[word.Uint](id, targets, sources)
+	return insns, instruction.NewMemRead[word.Uint](id, registers, sources)
 }
 
-func (p *Compiler) compileMul(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileMul(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
 	//
 	var (
+		target             = targets.Registers()[0]
 		constant word.Uint = word.Uint64[word.Uint](1)
 		nargs    []Expr
 		w        word.Uint
 		bitwidth = p.registers[target.Unwrap()].Width()
 	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	//
 	for _, e := range args {
 		var overflow bool
@@ -342,7 +424,15 @@ func (p *Compiler) compileMul(args []Expr, mapping []uint, target register.Id) (
 	return insns, instruction.NewMul[word.Uint](target, sources, constant)
 }
 
-func (p *Compiler) compileDiv(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileDiv(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
+	var (
+		target = targets.Registers()[0]
+	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	// Compile all operands upfront.
 	sources, insns := p.compileArgs(mapping, args...)
 	// Chain divisions left-to-right: (((a / b) / c) / ...).
@@ -357,7 +447,15 @@ func (p *Compiler) compileDiv(args []Expr, mapping []uint, target register.Id) (
 	return insns, instruction.NewDiv[word.Uint](target, value, sources[len(sources)-1])
 }
 
-func (p *Compiler) compileRem(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileRem(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
+	var (
+		target = targets.Registers()[0]
+	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	// Compile all operands upfront.
 	sources, insns := p.compileArgs(mapping, args...)
 	// Chain remainders left-to-right: (((a % b) % c) % ...).
@@ -372,7 +470,15 @@ func (p *Compiler) compileRem(args []Expr, mapping []uint, target register.Id) (
 	return insns, instruction.NewRem[word.Uint](target, value, sources[len(sources)-1])
 }
 
-func (p *Compiler) compileShl(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileShl(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
+	var (
+		target = targets.Registers()[0]
+	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	// Compile all operands upfront.
 	sources, insns := p.compileArgs(mapping, args...)
 	// Chain shifts left-to-right: (((a << b) << c) << ...).
@@ -387,7 +493,15 @@ func (p *Compiler) compileShl(args []Expr, mapping []uint, target register.Id) (
 	return insns, instruction.NewShl[word.Uint](target, value, sources[len(sources)-1])
 }
 
-func (p *Compiler) compileShr(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileShr(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
+	var (
+		target = targets.Registers()[0]
+	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	// Compile all operands upfront.
 	sources, insns := p.compileArgs(mapping, args...)
 	// Chain shifts left-to-right: (((a >> b) >> c) >> ...).
@@ -402,14 +516,20 @@ func (p *Compiler) compileShr(args []Expr, mapping []uint, target register.Id) (
 	return insns, instruction.NewShr[word.Uint](target, value, sources[len(sources)-1])
 }
 
-func (p *Compiler) compileSub(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileSub(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
 	//
 	var (
+		target   = targets.Registers()[0]
 		constant word.Uint
 		nargs    []Expr
 		w        word.Uint
 		bitwidth = p.registers[target.Unwrap()].Width()
 	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	//
 	for i, e := range args {
 		var overflow bool
@@ -433,13 +553,19 @@ func (p *Compiler) compileSub(args []Expr, mapping []uint, target register.Id) (
 	return insns, instruction.NewSub[word.Uint](target, sources, constant)
 }
 
-func (p *Compiler) compileAnd(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileAnd(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
 	var (
+		target   = targets.Registers()[0]
 		bitwidth = p.registers[target.Unwrap()].Width()
 		// Identity for AND is all-ones within the target bitwidth.
 		constant word.Uint
 		nargs    []Expr
 	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	// Start with all-ones (identity for AND).
 	constant = constant.Not(bitwidth)
 	//
@@ -460,19 +586,33 @@ func (p *Compiler) compileAnd(args []Expr, mapping []uint, target register.Id) (
 	return insns, instruction.NewAnd[word.Uint](target, sources, constant)
 }
 
-func (p *Compiler) compileNot(e *expr.BitwiseNot[symbol.Resolved], mapping []uint, target register.Id,
+func (p *Compiler) compileNot(e *expr.BitwiseNot[symbol.Resolved], mapping []uint, targets register.Vector,
 ) ([]MicroInstruction, MicroInstruction) {
+	var (
+		target = targets.Registers()[0]
+	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
+	//
 	sources, insns := p.compileArgs(mapping, e.Expr)
 	//
 	return insns, instruction.NewNot[word.Uint](target, sources[0])
 }
 
-func (p *Compiler) compileOr(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileOr(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
 	var (
+		target   = targets.Registers()[0]
 		bitwidth = p.registers[target.Unwrap()].Width()
 		constant word.Uint
 		nargs    []Expr
 	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	//
 	for _, e := range args {
 		if c, ok := e.(*expr.Const[symbol.Resolved]); ok {
@@ -491,12 +631,18 @@ func (p *Compiler) compileOr(args []Expr, mapping []uint, target register.Id) ([
 	return insns, instruction.NewOr[word.Uint](target, sources, constant)
 }
 
-func (p *Compiler) compileXor(args []Expr, mapping []uint, target register.Id) ([]MicroInstruction, MicroInstruction) {
+func (p *Compiler) compileXor(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
 	var (
+		target   = targets.Registers()[0]
 		bitwidth = p.registers[target.Unwrap()].Width()
 		constant word.Uint
 		nargs    []Expr
 	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
 	//
 	for _, e := range args {
 		if c, ok := e.(*expr.Const[symbol.Resolved]); ok {
@@ -530,7 +676,7 @@ func (p *Compiler) compileArgs(mapping []uint, exprs ...Expr) ([]register.Id, []
 			// Allocate temporary variable
 			targets[i] = p.allocate(bitwidth)
 			// Compile expression, storing result in temporary
-			insns = append(insns, p.compileExpr(e, mapping, targets[i])...)
+			insns = append(insns, p.compileExpr(e, mapping, register.NewVector(targets[i]))...)
 		}
 	}
 	//
