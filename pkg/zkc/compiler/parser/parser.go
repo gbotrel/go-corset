@@ -1183,7 +1183,7 @@ func (p *Parser) parseExpr(env Environment) (Expr, []source.SyntaxError) {
 func (p *Parser) parseArithExpr(env Environment) (Expr, []source.SyntaxError) {
 	var (
 		start     = p.index
-		arg, errs = p.parseUnitExpr(env)
+		arg, errs = p.parseConcatExpr(env)
 		args      = []Expr{arg}
 		tmp       Expr
 		binary    bool
@@ -1199,7 +1199,7 @@ func (p *Parser) parseArithExpr(env Environment) (Expr, []source.SyntaxError) {
 		// Consume connective
 		p.expect(p.lookahead().Kind)
 		//
-		tmp, errs = p.parseUnitExpr(env)
+		tmp, errs = p.parseConcatExpr(env)
 		// Accumulate arguments
 		args = append(args, tmp)
 	}
@@ -1258,6 +1258,35 @@ func (p *Parser) parseArithExpr(env Environment) (Expr, []source.SyntaxError) {
 	return arg, nil
 }
 
+func (p *Parser) parseConcatExpr(env Environment) (Expr, []source.SyntaxError) {
+	var (
+		exprs = make([]Expr, 1)
+		errs  []source.SyntaxError
+		start = p.index
+	)
+	// Parse initial expression
+	exprs[0], errs = p.parseUnitExpr(env)
+	// Check for trailing concatenation
+	for len(errs) == 0 && p.match(COLONCOLON) {
+		var expr Expr
+		//
+		expr, errs = p.parseUnitExpr(env)
+		exprs = append(exprs, expr)
+	}
+	//
+	if len(errs) > 0 {
+		return nil, errs
+	} else if len(exprs) == 1 {
+		return exprs[0], nil
+	}
+	// Bitwise concatenation
+	arg := expr.NewConcat(exprs...)
+	// Record span for this new expression
+	p.srcmap.Put(arg, p.spanOf(start, p.index-1))
+	//
+	return arg, nil
+}
+
 func (p *Parser) parseUnitExpr(env Environment) (Expr, []source.SyntaxError) {
 	var (
 		lookahead = p.lookahead()
@@ -1268,7 +1297,7 @@ func (p *Parser) parseUnitExpr(env Environment) (Expr, []source.SyntaxError) {
 
 	switch lookahead.Kind {
 	case IDENTIFIER:
-		nexpr, errors = p.parseConcatExpr(env)
+		nexpr, errors = p.parseAccessExpr(env)
 	case NUMBER:
 		var val big.Int
 		//
@@ -1323,37 +1352,6 @@ func (p *Parser) parseUnitExpr(env Environment) (Expr, []source.SyntaxError) {
 	}
 	//
 	return nexpr, errors
-}
-
-func (p *Parser) parseConcatExpr(env Environment) (Expr, []source.SyntaxError) {
-	var (
-		exprs = make([]Expr, 1)
-		errs  []source.SyntaxError
-	)
-	//
-	exprs[0], errs = p.parseAccessExpr(env)
-	//
-	for len(errs) == 0 && p.match(COLONCOLON) {
-		var (
-			expr  Expr
-			start = p.index
-		)
-		//
-		expr, errs = p.parseAccessExpr(env)
-		exprs = append(exprs, expr)
-		//
-		if len(errs) == 0 && !p.srcmap.Has(expr) {
-			p.srcmap.Put(expr, p.spanOf(start, p.index-1))
-		}
-	}
-	//
-	if len(errs) > 0 {
-		return nil, errs
-	} else if len(exprs) == 1 {
-		return exprs[0], nil
-	}
-	// Bitwise concatenation
-	return expr.NewConcat(exprs...), nil
 }
 
 func (p *Parser) parseAccessExpr(env Environment) (Expr, []source.SyntaxError) {
