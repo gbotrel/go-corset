@@ -293,7 +293,7 @@ func (p *Linker) linkLVal(lv lval.Unresolved) (lval.Resolved, []source.SyntaxErr
 	//
 	switch lv := lv.(type) {
 	case *lval.Variable[symbol.Unresolved]:
-		nlval = lval.NewVariable[symbol.Resolved](lv.Id)
+		nlval = lval.NewVariable[symbol.Resolved](lv.Ids...)
 	case *lval.MemAccess[symbol.Unresolved]:
 		// resolve symbols in memory name
 		name, errs1 := p.resolve(lv.Name, lv)

@@ -190,7 +190,23 @@ func (p *TypeChecker) typeLval(target LVal, env VariableMap, effects bit.Set) (T
 	// determine lhs width
 	switch t := target.(type) {
 	case *lval.Variable[symbol.Resolved]:
-		return env.Variable(t.Id).DataType, nil
+		var bitwidth uint
+		// Special case single variables
+		if len(t.Ids) == 1 {
+			return env.Variable(t.Ids[0]).DataType, nil
+		}
+		// Consider destructurings
+		for _, id := range t.Ids {
+			id_t := env.Variable(id).DataType.AsUint(p.env)
+			// Check whether have integer type or not
+			if id_t == nil {
+				return nil, p.srcmaps.SyntaxErrors(target, "expected integer type")
+			}
+			//
+			bitwidth += id_t.BitWidth()
+		}
+		//
+		return data.NewUnsignedInt[symbol.Resolved](bitwidth, false), nil
 	case *lval.MemAccess[symbol.Resolved]:
 		// Lookup the symbol
 		var extern = p.lookup(t.Name)

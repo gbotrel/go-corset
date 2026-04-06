@@ -1419,9 +1419,24 @@ func (p *Parser) parseLVal(env Environment) (LVal, []source.SyntaxError) {
 	if len(errs) > 0 {
 		return lv, errs
 	} else if env.IsDeclaredVariable(reg) {
-		lv = lval.NewVariable[symbol.Unresolved](env.LookupVariable(reg))
+		var vars = []variable.Id{env.LookupVariable(reg)}
+		// Look for destructuring lvals
+		for p.match(COLONCOLON) {
+			// save lookahead for error reporting
+			lookahead = p.lookahead()
+			//
+			if reg, errs = p.parseIdentifier(); len(errs) > 0 {
+				return lv, errs
+			} else if !env.IsDeclaredVariable(reg) {
+				return lv, p.syntaxErrors(lookahead, "unknown variable")
+			}
+			//
+			vars = append(vars, env.LookupVariable(reg))
+		}
+		//
+		lv = lval.NewVariable[symbol.Unresolved](vars...)
 	} else if !p.match(LSQUARE) {
-		return lv, p.syntaxErrors(lookahead, "unknown register")
+		return lv, p.syntaxErrors(lookahead, "unknown variable")
 	} else if index, errs = p.parseExprList(RSQUARE, env); len(errs) > 0 {
 		return lv, errs
 	} else {

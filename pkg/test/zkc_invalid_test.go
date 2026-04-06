@@ -74,6 +74,26 @@ func Test_ZkcInvalid_Basic_13(t *testing.T) {
 	checkZkcInvalid(t, "zkc/invalid/basic_13")
 }
 
+func Test_ZkcInvalid_Basic_14(t *testing.T) {
+	checkZkcInvalid(t, "zkc/invalid/basic_14")
+}
+
+func Test_ZkcInvalid_Basic_15(t *testing.T) {
+	checkZkcInvalid(t, "zkc/invalid/basic_15")
+}
+
+func Test_ZkcInvalid_Basic_16(t *testing.T) {
+	checkZkcInvalid(t, "zkc/invalid/basic_16")
+}
+
+func Test_ZkcInvalid_Basic_17(t *testing.T) {
+	checkZkcInvalid(t, "zkc/invalid/basic_17")
+}
+
+func Test_ZkcInvalid_Basic_18(t *testing.T) {
+	checkZkcInvalid(t, "zkc/invalid/basic_18")
+}
+
 // ===================================================================
 // If Tests
 // ===================================================================

@@ -75,6 +75,7 @@ func (p *Compiler) compileStatement(pc uint, mapping []uint, s Stmt) Instruction
 	return instruction.NewVector[word.Uint](insns...)
 }
 
+// Map lvals down to their corresponding registers.
 func (p *Compiler) mapLVals(mapping []uint, lvals []LVal) ([]register.Id, []MicroInstruction, []MicroInstruction) {
 	var (
 		regs                = make([]register.Id, len(lvals))
@@ -84,7 +85,11 @@ func (p *Compiler) mapLVals(mapping []uint, lvals []LVal) ([]register.Id, []Micr
 	for i, lv := range lvals {
 		switch lv := lv.(type) {
 		case *lval.Variable[symbol.Resolved]:
-			regs[i] = register.NewId(lv.Id)
+			if len(lv.Ids) != 1 {
+				panic("todo")
+			}
+			//
+			regs[i] = register.NewId(lv.Ids[0])
 		case *lval.MemAccess[symbol.Resolved]:
 			var (
 				ext = p.components[lv.Name.Index].(*Memory)
