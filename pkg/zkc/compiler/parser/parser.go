@@ -1268,7 +1268,7 @@ func (p *Parser) parseUnitExpr(env Environment) (Expr, []source.SyntaxError) {
 
 	switch lookahead.Kind {
 	case IDENTIFIER:
-		nexpr, errors = p.parseAccessExpr(env)
+		nexpr, errors = p.parseConcatExpr(env)
 	case NUMBER:
 		var val big.Int
 		//
@@ -1323,6 +1323,37 @@ func (p *Parser) parseUnitExpr(env Environment) (Expr, []source.SyntaxError) {
 	}
 	//
 	return nexpr, errors
+}
+
+func (p *Parser) parseConcatExpr(env Environment) (Expr, []source.SyntaxError) {
+	var (
+		exprs = make([]Expr, 1)
+		errs  []source.SyntaxError
+	)
+	//
+	exprs[0], errs = p.parseAccessExpr(env)
+	//
+	for len(errs) == 0 && p.match(COLONCOLON) {
+		var (
+			expr  Expr
+			start = p.index
+		)
+		//
+		expr, errs = p.parseAccessExpr(env)
+		exprs = append(exprs, expr)
+		//
+		if len(errs) == 0 && !p.srcmap.Has(expr) {
+			p.srcmap.Put(expr, p.spanOf(start, p.index-1))
+		}
+	}
+	//
+	if len(errs) > 0 {
+		return nil, errs
+	} else if len(exprs) == 1 {
+		return exprs[0], nil
+	}
+	// Bitwise concatenation
+	return expr.NewConcat(exprs...), nil
 }
 
 func (p *Parser) parseAccessExpr(env Environment) (Expr, []source.SyntaxError) {
