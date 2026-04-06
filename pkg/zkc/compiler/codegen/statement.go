@@ -193,11 +193,14 @@ func (p *Compiler) compileExpr(e Expr, mapping []uint, targets ...register.Vecto
 	)
 	//
 	switch e := e.(type) {
+	case *expr.Add[symbol.Resolved]:
+		insns, insn = p.compileAdd(e.Exprs, mapping, targets[0])
+		unitExpr = true
 	case *expr.Cast[symbol.Resolved]:
 		insns, insn = p.compileCast(e, mapping, targets[0])
 		unitExpr = true
-	case *expr.Add[symbol.Resolved]:
-		insns, insn = p.compileAdd(e.Exprs, mapping, targets[0])
+	case *expr.Concat[symbol.Resolved]:
+		insns, insn = p.compileConcat(e.Exprs, mapping, targets[0])
 		unitExpr = true
 	case *expr.BitwiseAnd[symbol.Resolved]:
 		insns, insn = p.compileAnd(e.Exprs, mapping, targets[0])
@@ -291,6 +294,24 @@ func (p *Compiler) compileCast(e *expr.Cast[symbol.Resolved], mapping []uint, ta
 	}
 	//
 	return insns, instruction.NewCast[word.Uint](target, sources[0], castWidth)
+}
+
+func (p *Compiler) compileConcat(args []Expr, mapping []uint, targets register.Vector,
+) ([]MicroInstruction, MicroInstruction) {
+	var (
+		target = targets.Registers()[0]
+		nargs  []Expr
+	)
+	//
+	if len(targets.Registers()) != 1 {
+		panic("need to implement destructuring")
+	}
+	//
+	nargs = append(nargs, args...)
+	// Compile arguments
+	sources, insns := p.compileArgs(mapping, nargs...)
+	// Done
+	return insns, instruction.NewConcat[word.Uint](target, sources)
 }
 
 func (p *Compiler) compileAdd(args []Expr, mapping []uint, targets register.Vector,
