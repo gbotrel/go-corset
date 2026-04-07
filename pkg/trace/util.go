@@ -109,10 +109,11 @@ func (p *columnAdapter[F1, F2]) Get(row int) F2 {
 	var (
 		from = p.col.Get(row)
 		to   F2
+		tmp  F1
 	)
 
 	u := from.Uint64()
-	if from.Equals(from.SetUint64(u)) {
+	if from.Equals(tmp.SetUint64(u)) {
 		return to.SetUint64(u)
 	}
 
